@@ -1,0 +1,239 @@
+package main
+
+import (
+	"database/sql"
+	"fmt"
+	"net/http"
+	"time"
+
+	log "github.com/sirupsen/logrus"
+
+	_ "github.com/go-sql-driver/mysql"
+
+	"github.com/gin-gonic/gin"
+)
+
+type Data struct {
+	Username string `json:"Username"`
+	Usertype string `json:"Usertype"`
+	Clients  string `json:"Clients"`
+}
+
+type UserType string
+
+const (
+	client UserType = "Client" //enum
+	admin  UserType = "Admin"
+)
+
+const (
+	db_name = "tests"
+	db_host = "127.0.0.1"
+	db_user = "root"
+	db_pass = "!KV54691123s"
+	db_port = 3306
+)
+
+func main() {
+
+	var data Data
+
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8", db_user, db_pass, db_host, db_port, db_name)
+	DB, err := sql.Open("mysql", dsn)
+	if err != nil {
+		log.Panic("Failed to connect to database: ", err)
+	}
+
+	//overtime times
+	DB.SetConnMaxLifetime(3 * time.Minute)
+	// maximum connection number
+	DB.SetMaxOpenConns(100)
+	// Set the number of idle connections
+	DB.SetMaxIdleConns(16)
+	if err := DB.Ping(); err != nil {
+		log.Error("DB.Ping = ", err)
+	}
+
+	r := gin.Default()
+
+	r.POST("/kript/:adminname/admin", func(c *gin.Context) {
+		var adminname string = c.Param("adminname")
+
+		tx, err := DB.Begin()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"message": "Internal Server Error.",
+			})
+			return
+		}
+		defer tx.Rollback()
+		insert, err := DB.Query("INSERT INTO user(username, usertype) VALUES(?, ?)", adminname, admin)
+		if err != nil {
+			log.Error("Failed to connect to database !")
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"message": "Internal Server Error.",
+			})
+		}
+		defer insert.Close()
+
+	})
+
+	r.DELETE("/kript/:adminname/admin", func(c *gin.Context) {
+		var adminname string = c.Param("adminname")
+		_, err := DB.Query("UPDATE test.user SET usertype = (?) WHERE username = (?)", client, adminname)
+		if err != nil {
+			log.Error("Failed to connect to database !")
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"message": "Internal Server Error.",
+			})
+		}
+
+	})
+
+	r.POST("/:username/client/:guid", func(c *gin.Context) {
+		var username string = c.Param("username")
+		var guid string = c.Param("guid")
+		fmt.Println(username)
+		fmt.Println(guid)
+		tx, err := DB.Begin()
+		if err != nil {
+			log.Error("Failed to connect to database !")
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"message": "Internal Server Error.",
+			})
+		}
+		defer tx.Rollback() // The rollback will be ignored if the tx has been committed later in the function.
+
+		insert, err := DB.Query("INSERT INTO user(username, usertype) VALUES(?, ?)", username, client)
+		if err != nil {
+			log.Error("Failed to connect to database !")
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"message": "Internal Server Error.",
+			})
+		}
+		defer insert.Close()
+
+		insert, err = DB.Query("INSERT INTO client_user(client_guid) VALUES(?)", guid)
+		if err != nil {
+			log.Error("Failed to connect to database !")
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"message": "Internal Server Error.",
+			})
+		}
+		defer insert.Close()
+	})
+
+	r.DELETE("/:username/client/:guid", func(c *gin.Context) {
+
+	})
+
+	r.GET("/admin", func(c *gin.Context) {
+
+		rows, err := DB.Query("Select username FROM user WHERE usertype = (?)", admin)
+		if err != nil {
+			log.Error("Failed to connect to database !")
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"message": "Internal Server Error.",
+			})
+		}
+		var datas []Data
+		for rows.Next() {
+			err := rows.Scan(&data.Username)
+			if err != nil {
+				log.Error("Failed to connect to database !")
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"message": "Internal Server Error.",
+				})
+			}
+			datas = append(datas, Data{Username: data.Username})
+		}
+		c.JSON(http.StatusOK, datas)
+	})
+
+	r.GET("/client", func(c *gin.Context) {
+
+		rows, err := DB.Query("Select username FROM user WHERE usertype = (?)", client)
+		if err != nil {
+			log.Error("Failed to connect to database !")
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"message": "Internal Service Error.",
+			})
+			return
+		}
+		rows2, err := DB.Query("Select client_guid FROM client_user")
+		if err != nil {
+			log.Error("Failed to connect to database !")
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"message": "Internal Service Error.",
+			})
+		}
+
+		var datas []Data
+		for rows.Next() && rows2.Next() {
+			err := rows.Scan(&data.Username)
+			if err != nil {
+
+				log.Error("Failed to connect to database !")
+
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"message": "Internal Service Error.",
+				})
+			}
+			err2 := rows2.Scan(&data.Clients)
+			if err2 != nil {
+				log.Error("Failed to connect to database !")
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"message": "Internal Service Error.",
+				})
+
+			}
+
+			datas = append(datas, Data{Username: data.Username, Usertype: string(client), Clients: data.Clients})
+
+		}
+		c.JSON(http.StatusOK, datas)
+	})
+
+	r.Run(":8080") // listen and serve	return DB
+}
+
+//func getDatabaseUser(username, guid string) (s *Server) {
+
+// Add user in database
+//dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8", db_user, db_pass, db_host, db_port, db_name)
+//DB, err := sql.Open("mysql", dsn)
+//tx, err := s.DB.Begin()
+//if err != nil {
+//	log.Fatal(err)
+//}
+//defer tx.Rollback() // The rollback will be ignored if the tx has been committed later in the function.
+//
+//insert, err := s.DB.Query("INSERT INTO user(username, usertype) VALUES(?, ?)", username, client)
+//if err != nil {
+//	log.Fatal(err)
+//}
+//defer insert.Close()
+//
+//insert, err = tx.Query("INSERT INTO client_user(client_guid) VALUES(?)", guid)
+//if err != nil {
+//	log.Fatal(err)
+//}
+//defer insert.Close()
+//
+//fmt.Println("Succesfully")
+
+//}
+
+//func getDatabaseAdmin(adminname string) (DB *sql.DB) {
+//
+//	insert, err := DB.Query("INSERT INTO user(username, usertype) VALUES(?, ?)", adminname, admin)
+//	if err != nil {
+//		panic(err.Error())
+//	}
+//	defer insert.Close()
+//
+//	fmt.Println("Succesfully")
+//	return DB
+//
+//}
+//
