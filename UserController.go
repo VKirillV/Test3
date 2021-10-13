@@ -4,13 +4,14 @@ import (
 	"database/sql"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 
-	_ "github.com/go-sql-driver/mysql"
-
 	"github.com/gin-gonic/gin"
+	_ "github.com/go-sql-driver/mysql"
+	"github.com/joho/godotenv"
 )
 
 type Data struct {
@@ -26,19 +27,32 @@ const (
 	admin  UserType = "Admin"
 )
 
-const (
-	db_name = "tests"
-	db_host = "127.0.0.1"
-	db_user = "root"
-	db_pass = "!KV54691123s"
-	db_port = 3306
-)
+//const (
+//	db_name = "tests"
+//	db_host = "127.0.0.1"
+//	db_user = "root"
+//	db_pass = "!KV54691123s"
+//	db_port = 3306
+//)
+
+func init() {
+	e := godotenv.Load()
+	if e != nil {
+		log.Println(e)
+	}
+}
 
 func main() {
 
 	var data Data
 
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8", db_user, db_pass, db_host, db_port, db_name)
+	db_name := os.Getenv("db_name")
+	db_host := os.Getenv("db_host")
+	db_user := os.Getenv("db_user")
+	db_pass := os.Getenv("db_pass")
+	db_port := os.Getenv("db_port")
+
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8", string(db_user), string(db_pass), string(db_host), db_port, string(db_name))
 	DB, err := sql.Open("mysql", dsn)
 	if err != nil {
 		log.Panic("Failed to connect to database: ", err)
