@@ -14,10 +14,14 @@ import (
 	"github.com/joho/godotenv"
 )
 
-type Data struct {
-	Username string `json:"Username"`
-	Usertype string `json:"Usertype"`
-	Clients  string `json:"Clients"`
+type Data_Admin struct {
+	Username string `json:"username"`
+}
+
+type Data_Client struct {
+	Username string `json:"username"`
+	Usertype string `json:"usertype"`
+	Clients  string `json:"clients"`
 }
 
 type UserType string
@@ -44,15 +48,16 @@ func init() {
 
 func main() {
 
-	var data Data
-
+	var data_client Data_Client
+	var data_admin Data_Admin
 	db_name := os.Getenv("db_name")
 	db_host := os.Getenv("db_host")
 	db_user := os.Getenv("db_user")
 	db_pass := os.Getenv("db_pass")
 	db_port := os.Getenv("db_port")
+	port_server := ":" + os.Getenv("port_server")
 
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8", string(db_user), string(db_pass), string(db_host), db_port, string(db_name))
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8", string(db_user), string(db_pass), string(db_host), string(db_port), string(db_name))
 	DB, err := sql.Open("mysql", dsn)
 	if err != nil {
 		log.Panic("Failed to connect to database: ", err)
@@ -150,16 +155,16 @@ func main() {
 				"message": "Internal Server Error.",
 			})
 		}
-		var datas []Data
+		var datas []Data_Admin
 		for rows.Next() {
-			err := rows.Scan(&data.Username)
+			err := rows.Scan(&data_admin.Username)
 			if err != nil {
 				log.Error("Failed to connect to database !")
 				c.JSON(http.StatusInternalServerError, gin.H{
 					"message": "Internal Server Error.",
 				})
 			}
-			datas = append(datas, Data{Username: data.Username})
+			datas = append(datas, Data_Admin{Username: data_admin.Username})
 		}
 		c.JSON(http.StatusOK, datas)
 	})
@@ -172,7 +177,7 @@ func main() {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"message": "Internal Service Error.",
 			})
-			return
+
 		}
 		rows2, err := DB.Query("Select client_guid FROM client_user")
 		if err != nil {
@@ -180,11 +185,12 @@ func main() {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"message": "Internal Service Error.",
 			})
+			return
 		}
 
-		var datas []Data
+		var datas []Data_Client
 		for rows.Next() && rows2.Next() {
-			err := rows.Scan(&data.Username)
+			err := rows.Scan(&data_client.Username)
 			if err != nil {
 
 				log.Error("Failed to connect to database !")
@@ -193,7 +199,7 @@ func main() {
 					"message": "Internal Service Error.",
 				})
 			}
-			err2 := rows2.Scan(&data.Clients)
+			err2 := rows2.Scan(&data_client.Clients)
 			if err2 != nil {
 				log.Error("Failed to connect to database !")
 				c.JSON(http.StatusInternalServerError, gin.H{
@@ -201,14 +207,13 @@ func main() {
 				})
 
 			}
-
-			datas = append(datas, Data{Username: data.Username, Usertype: string(client), Clients: data.Clients})
+			datas = append(datas, Data_Client{Username: data_client.Username, Usertype: string(client), Clients: data_client.Clients})
 
 		}
 		c.JSON(http.StatusOK, datas)
 	})
 
-	r.Run(":8080") // listen and serve	return DB
+	r.Run(port_server) // listen and serve	return DB
 }
 
 //func getDatabaseUser(username, guid string) (s *Server) {
