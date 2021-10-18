@@ -1,19 +1,23 @@
-package init
+package db
 
 import (
 	"database/sql"
+
 	"fmt"
 	"os"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/golang-migrate/migrate"
+	"github.com/golang-migrate/migrate/database/mysql"
+	_ "github.com/golang-migrate/migrate/source/file"
 	"github.com/joho/godotenv"
 	log "github.com/sirupsen/logrus"
 )
 
+func InitDB() *sql.DB {
+	var err error
 
-func init() {
-	
 	e := godotenv.Load()
 	if e != nil {
 		log.Println(e)
@@ -30,6 +34,14 @@ func init() {
 	if err != nil {
 		log.Panic("Failed to connect to database: ", err)
 	}
+	driver, _ := mysql.WithInstance(DB, &mysql.Config{})
+	m, _ := migrate.NewWithDatabaseInstance(
+		"file://db/migrations",
+		"mysql",
+		driver,
+	)
+
+	m.Steps(2)
 
 	//overtime times
 	DB.SetConnMaxLifetime(3 * time.Minute)
@@ -40,5 +52,6 @@ func init() {
 	if err := DB.Ping(); err != nil {
 		log.Error("DB.Ping = ", err)
 	}
+	return DB
 
 }
