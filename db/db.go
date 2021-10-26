@@ -2,8 +2,8 @@ package db
 
 import (
 	"database/sql"
-
 	"fmt"
+
 	"os"
 	"time"
 
@@ -11,17 +11,12 @@ import (
 	"github.com/golang-migrate/migrate"
 	"github.com/golang-migrate/migrate/database/mysql"
 	_ "github.com/golang-migrate/migrate/source/file"
-	"github.com/joho/godotenv"
 	log "github.com/sirupsen/logrus"
 )
 
 func InitDB() *sql.DB {
-	var err error
 
-	e := godotenv.Load()
-	if e != nil {
-		log.Println(e)
-	}
+	var err error
 
 	db_name := os.Getenv("db_name")
 	db_host := os.Getenv("db_host")
@@ -52,6 +47,7 @@ func InitDB() *sql.DB {
 	if err := DB.Ping(); err != nil {
 		log.Error("DB.Ping = ", err)
 	}
+
 	return DB
 
 }
