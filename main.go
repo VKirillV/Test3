@@ -1,26 +1,20 @@
 package main
 
 import (
-	"log"
-	"os"
-
+	"fmt"
 	"library/AdminController"
 	"library/ClientController"
+	"library/TelegramBot"
+	"os"
 
-	"github.com/joho/godotenv"
+	_ "github.com/joho/godotenv/autoload"
 
 	"github.com/gin-gonic/gin"
 )
 
-func init() {
-
-	e := godotenv.Load()
-	if e != nil {
-		log.Println(e)
-	}
-}
-
 func main() {
+	go TelegramBot.TelegramBot()
+	fmt.Println("Server is starting...")
 
 	port_server := ":" + os.Getenv("port_server")
 
@@ -33,5 +27,6 @@ func main() {
 	r.GET("/admin", AdminController.GetAdminController)
 	r.GET("/client", ClientController.GetClientController)
 
-	r.Run(port_server) // listen and serve	return DB
+	r.Run(port_server)
+
 }

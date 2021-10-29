@@ -35,19 +35,12 @@ func InitDB() *sql.DB {
 		"mysql",
 		driver,
 	)
-
 	m.Steps(2)
-
-	//overtime times
 	DB.SetConnMaxLifetime(3 * time.Minute)
-	// maximum connection number
 	DB.SetMaxOpenConns(100)
-	// Set the number of idle connections
 	DB.SetMaxIdleConns(16)
 	if err := DB.Ping(); err != nil {
 		log.Error("DB.Ping = ", err)
 	}
-
 	return DB
-
 }

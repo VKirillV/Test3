@@ -1,6 +1,7 @@
 package TelegramBot
 
 import (
+	"fmt"
 	"library/db"
 	"os"
 
@@ -13,6 +14,7 @@ type Data struct {
 }
 
 func TelegramBot() {
+	fmt.Println("TelegramBot is starting...")
 	var data Data
 
 	client := "Client"
@@ -41,13 +43,13 @@ func TelegramBot() {
 		}
 		rows, err := DB.Query("Select username FROM user WHERE username = (?)", update.Message.From.UserName)
 		if err != nil {
-			log.Error("Failed to connect to database!", err)
+			log.Error("Failed to select certain data in the database! ", err)
 		}
 
 		for rows.Next() {
 			err := rows.Scan(&data.Username)
 			if err != nil {
-				log.Error("Failed to connect to database!", err)
+				log.Error("The structures does not match! ", err)
 			}
 		}
 
@@ -57,13 +59,14 @@ func TelegramBot() {
 			bot.Send(msg)
 		} else if data.Username != update.Message.From.UserName {
 
-			_, err := DB.Query("INSERT INTO user(username, usertype) VALUES (?, ?)", update.Message.From.UserName, client)
+			_, err := DB.Query("INSERT INTO user(username, user_type) VALUES (?, ?)", update.Message.From.UserName, client)
 			if err != nil {
-				panic(err.Error())
+				log.Error("Failed to insert data in the database! ", err)
 			}
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "You subscribed")
 			bot.Send(msg)
 
 		}
 	}
+
 }

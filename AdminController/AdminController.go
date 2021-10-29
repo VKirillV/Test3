@@ -2,6 +2,7 @@ package AdminController
 
 import (
 	"database/sql"
+	Error "library/JsonError"
 	"library/db"
 	"net/http"
 
@@ -23,7 +24,7 @@ type Data_Client struct {
 type UserType string
 
 const (
-	client UserType = "Client" //enum
+	client UserType = "Client"
 	admin  UserType = "Admin"
 )
 
@@ -34,54 +35,52 @@ func PostAdminController(c *gin.Context) {
 	DB := db.InitDB()
 	var adminname string = c.Param("adminname")
 	tx, err := DB.Begin()
-	if err != nil {
+	if Error.Error(c, err) {
 		log.Error("Failed to connect to database! ", err)
-		c.JSON(http.StatusInternalServerError, err)
 		return
 	}
 	defer tx.Rollback()
 
 	rows, err := DB.Query("Select username FROM user WHERE username = (?)", adminname)
 	if err != nil {
-		log.Error("Failed to connect to database!", err)
+		log.Error("Failed to select certain data in the database! ", err)
 	}
 
 	for rows.Next() {
 		err := rows.Scan(&data_admin.Username)
 		if err != nil {
-			log.Error("Failed to connect to database!", err)
+			log.Error("The structures does not match! ", err)
 		}
 	}
 
 	if data_admin.Username == adminname {
-		// change usertype
-		insert, err := DB.Prepare("UPDATE test.user SET user_type = (?) WHERE username = (?)")
-		if err != nil {
-			log.Error("Failed to connect to database! ", err)
-			c.JSON(http.StatusInternalServerError, err)
+		update, err := DB.Prepare("UPDATE test2.user SET user_type = (?) WHERE username = (?)")
+		if Error.Error(c, err) {
+			log.Error("Failed to update data in the database! ", err)
+			return
 		}
-		defer insert.Close()
+		defer update.Close()
 
-		_, err = insert.Exec(admin, adminname)
-		if err != nil {
-			log.Error("Failed to connect to database! ", err)
-			c.JSON(http.StatusInternalServerError, err)
+		_, err = update.Exec(admin, adminname)
+		if Error.Error(c, err) {
+			log.Error("Failed to execute data in the database! ", err)
+			return
 		}
 
 	} else if data_admin.Username != adminname {
 
 		insert, err := tx.Prepare("INSERT INTO user(username, user_type) VALUES(?, ?)")
-		if err != nil {
-			log.Error("Failed to connect to database! ", err)
-			c.JSON(http.StatusInternalServerError, err)
+		if Error.Error(c, err) {
+			log.Error("Failed to insert data in the database! ", err)
+			return
 		}
 
 		defer insert.Close()
 
 		_, err = insert.Exec(adminname, admin)
-		if err != nil {
-			log.Error("Failed to connect to database! ", err)
-			c.JSON(http.StatusInternalServerError, err)
+		if Error.Error(c, err) {
+			log.Error("Failed to execute data in the database! ", err)
+			return
 		}
 		tx.Commit()
 
@@ -92,23 +91,22 @@ func DeleteAdminController(c *gin.Context) {
 	var adminname string = c.Param("adminname")
 	DB := db.InitDB()
 	tx, err := DB.Begin()
-	if err != nil {
+	if Error.Error(c, err) {
 		log.Error("Failed to connect to database! ", err)
-		c.JSON(http.StatusInternalServerError, err)
 		return
 	}
 	defer tx.Rollback()
-	insert, err := tx.Prepare("UPDATE test2.user SET user_type = (?) WHERE username = (?)")
-	if err != nil {
-		log.Error("Failed to connect to database! ", err)
-		c.JSON(http.StatusInternalServerError, err)
+	update, err := tx.Prepare("UPDATE test2.user SET user_type = (?) WHERE username = (?)")
+	if Error.Error(c, err) {
+		log.Error("Failed to update data in the database! ", err)
+		return
 	}
-	defer insert.Close()
+	defer update.Close()
 
-	_, err = insert.Exec(client, adminname)
-	if err != nil {
-		log.Error("Failed to connect to database! ", err)
-		c.JSON(http.StatusInternalServerError, err)
+	_, err = update.Exec(client, adminname)
+	if Error.Error(c, err) {
+		log.Error("Failed to execute data in the database! ", err)
+		return
 	}
 	tx.Commit()
 }
@@ -119,16 +117,16 @@ func GetAdminController(c *gin.Context) {
 
 	rows, err := DB.Query("Select username FROM user WHERE user_type = (?)", admin)
 	if err != nil {
-		log.Error("Failed to connect to database! ", err)
+		log.Error("Failed to select certain data in the database! ", err)
 	}
-	var datas []Data_Admin
+	var All_Admin []Data_Admin
 	for rows.Next() {
 		err := rows.Scan(&data_admin.Username)
 		if err != nil {
-			log.Error("Failed to connect to database! ", err)
+			log.Error("The structures does not match! ", err)
 		}
-		datas = append(datas, Data_Admin{Username: data_admin.Username})
+		All_Admin = append(All_Admin, Data_Admin{Username: data_admin.Username})
 	}
-	c.JSON(http.StatusOK, datas)
+	c.JSON(http.StatusOK, All_Admin)
 
 }
