@@ -2,19 +2,23 @@ package TelegramBot
 
 import (
 	"fmt"
+	Error "library/JsonError"
+	Notification "library/NotificationService"
 	"library/db"
 	"os"
 
+	"github.com/gin-gonic/gin"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	log "github.com/sirupsen/logrus"
 )
 
 type Data struct {
-	Username string
+	Username         string
+	Telegram_chat_id int
 }
 
-func TelegramBot() {
-	fmt.Println("TelegramBot is starting...")
+func TelegramBot() (c *gin.Context) {
+	fmt.Println("GoGinBot is starting...")
 	var data Data
 
 	client := "Client"
@@ -41,32 +45,68 @@ func TelegramBot() {
 		if update.Message == nil {
 			continue
 		}
-		rows, err := DB.Query("Select username FROM user WHERE username = (?)", update.Message.From.UserName)
+		TelegramUser := update.Message.From.UserName
+		chat_ID := update.Message.Chat.ID
+		bot_self_id := bot.Self.ID
+
+		rows, err := DB.Query("Select username, telegram_chat_id FROM user WHERE username = (?)", TelegramUser)
 		if err != nil {
 			log.Error("Failed to select certain data in the database! ", err)
 		}
 
 		for rows.Next() {
-			err := rows.Scan(&data.Username)
+			err := rows.Scan(&data.Username, &data.Telegram_chat_id)
 			if err != nil {
 				log.Error("The structures does not match! ", err)
 			}
 		}
 
-		if data.Username == update.Message.From.UserName {
+		if data.Username == TelegramUser {
+			if data.Telegram_chat_id == 0 {
+				update, err := DB.Prepare("UPDATE test2.user SET telegram_chat_id = (?) WHERE username = (?)")
+				if Error.Error(c, err) {
+					log.Error("Failed to update data in the database! ", err)
+					return
+				}
 
-			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "You are registered")
-			bot.Send(msg)
-		} else if data.Username != update.Message.From.UserName {
+				_, err = update.Exec(bot_self_id, data.Username)
+				if Error.Error(c, err) {
+					log.Error("Failed to execute data in the database! ", err)
+					return
+				}
+				msg := tgbotapi.NewMessage(chat_ID, "Successfully subscribed on updates")
+				_, err = bot.Send(msg)
+				if err == nil {
+					log.Infof("Message successfully delivered to %s", TelegramUser)
+				} else if err != nil {
+					log.Errorf("Message delivery failed to user %s with error: %s", TelegramUser, err)
+				}
+				Notification.Notification(chat_ID, TelegramUser, bot_self_id)
+			} else {
+				msg := tgbotapi.NewMessage(chat_ID, "You are registered")
+				_, err = bot.Send(msg)
+				if err == nil {
+					log.Infof("Message successfully delivered to %s", TelegramUser)
+				} else if err != nil {
+					log.Errorf("Message delivery failed to user %s with error: %s", TelegramUser, err)
+				}
+			}
 
-			_, err := DB.Query("INSERT INTO user(username, user_type) VALUES (?, ?)", update.Message.From.UserName, client)
+		} else if data.Username != TelegramUser {
+
+			_, err := DB.Query("INSERT INTO user(username, user_type, telegram_chat_id) VALUES (?, ?, ?)", TelegramUser, client, bot_self_id)
 			if err != nil {
 				log.Error("Failed to insert data in the database! ", err)
 			}
-			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "You subscribed")
-			bot.Send(msg)
-
+			msg := tgbotapi.NewMessage(chat_ID, "Successfully subscribed on updates")
+			_, err = bot.Send(msg)
+			if err == nil {
+				log.Infof("Message successfully delivered to %s", TelegramUser)
+			} else if err != nil {
+				log.Errorf("Message delivery failed to user %s with error: %s", TelegramUser, err)
+			}
+			Notification.Notification(chat_ID, TelegramUser, bot_self_id)
 		}
 	}
-
+	return
 }
