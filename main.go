@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"library/AdminController"
 	"library/ClientController"
-	"library/TelegramBot"
+	start "library/TelegramBotConnection"
 	"os"
 
 	_ "github.com/joho/godotenv/autoload"
@@ -13,7 +13,7 @@ import (
 )
 
 func main() {
-	go TelegramBot.TelegramBot()
+	go start.ConnectBot()
 	fmt.Println("Server is starting...")
 
 	port_server := ":" + os.Getenv("port_server")

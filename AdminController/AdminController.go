@@ -11,7 +11,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type Data_Admin struct {
+type DataAdmin struct {
 	Username string `json:"username"`
 }
 
@@ -31,8 +31,8 @@ const (
 var DB *sql.DB
 
 func PostAdminController(c *gin.Context) {
-	var data_admin Data_Admin
-	DB := db.InitDB()
+	var dataAdmin DataAdmin
+	DB := db.Connect()
 	var adminname string = c.Param("adminname")
 	tx, err := DB.Begin()
 	if Error.Error(c, err) {
@@ -47,13 +47,13 @@ func PostAdminController(c *gin.Context) {
 	}
 
 	for rows.Next() {
-		err := rows.Scan(&data_admin.Username)
+		err := rows.Scan(&dataAdmin.Username)
 		if err != nil {
 			log.Error("The structures does not match! ", err)
 		}
 	}
 
-	if data_admin.Username == adminname {
+	if dataAdmin.Username == adminname {
 		update, err := DB.Prepare("UPDATE test2.user SET user_type = (?) WHERE username = (?)")
 		if Error.Error(c, err) {
 			log.Error("Failed to update data in the database! ", err)
@@ -67,7 +67,7 @@ func PostAdminController(c *gin.Context) {
 			return
 		}
 
-	} else if data_admin.Username != adminname {
+	} else if dataAdmin.Username != adminname {
 
 		insert, err := tx.Prepare("INSERT INTO user(username, user_type) VALUES(?, ?)")
 		if Error.Error(c, err) {
@@ -89,7 +89,7 @@ func PostAdminController(c *gin.Context) {
 
 func DeleteAdminController(c *gin.Context) {
 	var adminname string = c.Param("adminname")
-	DB := db.InitDB()
+	DB := db.Connect()
 	tx, err := DB.Begin()
 	if Error.Error(c, err) {
 		log.Error("Failed to connect to database! ", err)
@@ -112,21 +112,21 @@ func DeleteAdminController(c *gin.Context) {
 }
 
 func GetAdminController(c *gin.Context) {
-	var data_admin Data_Admin
-	DB := db.InitDB()
+	var dataAdmin DataAdmin
+	DB := db.Connect()
 
 	rows, err := DB.Query("Select username FROM user WHERE user_type = (?)", admin)
 	if err != nil {
 		log.Error("Failed to select certain data in the database! ", err)
 	}
-	var All_Admin []Data_Admin
+	var allAdmin []DataAdmin
 	for rows.Next() {
-		err := rows.Scan(&data_admin.Username)
+		err := rows.Scan(&dataAdmin.Username)
 		if err != nil {
 			log.Error("The structures does not match! ", err)
 		}
-		All_Admin = append(All_Admin, Data_Admin{Username: data_admin.Username})
+		allAdmin = append(allAdmin, DataAdmin{Username: dataAdmin.Username})
 	}
-	c.JSON(http.StatusOK, All_Admin)
+	c.JSON(http.StatusOK, allAdmin)
 
 }

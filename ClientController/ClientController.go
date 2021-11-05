@@ -10,18 +10,18 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type Data_Client struct {
+type DataClient struct {
 	Username string   `json:"username"`
 	Usertype string   `json:"usertype"`
 	Clients  []string `json:"clients"`
 }
 
-type Client_Data struct {
-	Clients_guid string `json:"clients"`
-	Guid_array   string
+type ClientData struct {
+	ClientsGuid string `json:"clients"`
+	GuidArray   string
 }
 
-type Query_Parametrs struct {
+type QueryParametrs struct {
 	Username string `json:"username"`
 }
 type UserType string
@@ -36,7 +36,7 @@ var DB *sql.DB
 func PostClientController(c *gin.Context) {
 	var username string = c.Param("username")
 	var guid string = c.Param("guid")
-	DB := db.InitDB()
+	DB := db.Connect()
 	tx, err := DB.Begin()
 	if Error.Error(c, err) {
 		log.Error("Failed to connect to database! ", err)
@@ -52,14 +52,14 @@ func PostClientController(c *gin.Context) {
 	}
 	defer insert.Close()
 	_, _ = insert.Exec(username, client)
-	defer User_fk(username, guid)
+	defer GetUserfk(username, guid)
 	tx.Commit()
 }
 
 func DeleteClientController(c *gin.Context) {
-	var data_client Data_Client
+	var dataClient DataClient
 	var username string = c.Param("username")
-	DB := db.InitDB()
+	DB := db.Connect()
 	tx, err := DB.Begin()
 	if Error.Error(c, err) {
 		log.Error("Failed to connect to database! ", err)
@@ -74,7 +74,7 @@ func DeleteClientController(c *gin.Context) {
 	}
 
 	for id.Next() {
-		err := id.Scan(&data_client.Username)
+		err := id.Scan(&dataClient.Username)
 		if err != nil {
 			log.Error("The structures does not match! ", err)
 		}
@@ -84,7 +84,7 @@ func DeleteClientController(c *gin.Context) {
 			return
 		}
 		defer delete.Close()
-		_, err = delete.Exec(data_client.Username)
+		_, err = delete.Exec(dataClient.Username)
 		if Error.Error(c, err) {
 			log.Error("Failed to execute data in the database! ", err)
 			return
@@ -94,72 +94,72 @@ func DeleteClientController(c *gin.Context) {
 }
 
 func GetClientController(c *gin.Context) {
-	var data_client Data_Client
-	var client_data Client_Data
-	var query_parametrs Query_Parametrs
-	var All_Client []Data_Client
-	var All_ClientGuid []Query_Parametrs
-	client_guid := c.DefaultQuery("client_guid", "Guest")
-	DB := db.InitDB()
+	var dataClient DataClient
+	var clientData ClientData
+	var queryParametrs QueryParametrs
+	var allClient []DataClient
+	var allClientGuid []QueryParametrs
+	clientGuid := c.DefaultQuery("client_guid", "Guest")
+	DB := db.Connect()
 
-	if client_guid == "Guest" {
+	if clientGuid == "Guest" {
 		rows, err := DB.Query("Select id, username FROM user WHERE user_type = (?)", client)
 		if err != nil {
 			log.Error("Failed to select certain data in the database! ", err)
 		}
 		for rows.Next() {
-			err := rows.Scan(&client_data.Clients_guid, &data_client.Username)
+			err := rows.Scan(&clientData.ClientsGuid, &dataClient.Username)
 			if err != nil {
 				log.Error("The structures does not match! ", err)
 			}
-			rows2, err := DB.Query("Select client_guid FROM client_user INNER JOIN user ON user.id = client_user.user_fk WHERE user.id = (?)", client_data.Clients_guid)
+			rows2, err := DB.Query("Select client_guid FROM client_user INNER JOIN user ON user.id = client_user.user_fk WHERE user.id = (?)", clientData.ClientsGuid)
 			if err != nil {
 				log.Error("Failed to select certain data in the database! ", err)
 			}
-			All_ClientGuid := []string{}
+			allClientGuid := []string{}
 			for rows2.Next() {
-				err2 := rows2.Scan(&client_data.Guid_array)
+				err2 := rows2.Scan(&clientData.GuidArray)
 				if err2 != nil {
 					log.Error("The structures does not match! ", err)
 				}
-				All_ClientGuid = append(All_ClientGuid, client_data.Guid_array)
+				allClientGuid = append(allClientGuid, clientData.GuidArray)
 			}
-			All_Client = append(All_Client, Data_Client{Username: string(data_client.Username), Usertype: string(client), Clients: All_ClientGuid})
+			allClient = append(allClient, DataClient{Username: string(dataClient.Username), Usertype: string(client), Clients: allClientGuid})
 		}
-		c.JSON(http.StatusOK, All_Client)
+		c.JSON(http.StatusOK, allClient)
 	} else {
 
-		rows_guid, err := DB.Query("Select user_fk FROM client_user WHERE client_guid = (?)", client_guid)
+		rowsGuid, err := DB.Query("Select user_fk FROM client_user WHERE client_guid = (?)", clientGuid)
 		if err != nil {
 			log.Error("Failed to select certain data in the database! ", err)
 
 		}
 
-		for rows_guid.Next() {
-			err := rows_guid.Scan(&client_data.Clients_guid)
+		for rowsGuid.Next() {
+			err := rowsGuid.Scan(&clientData.ClientsGuid)
 			if err != nil {
 				log.Error("The structures does not match! ", err)
 			}
-			rows_UserFK, err := DB.Query("Select username FROM user INNER JOIN client_user ON client_user.user_fk = user.id WHERE client_user.user_fk = (?)", &client_data.Clients_guid)
+			rowsUserFk, err := DB.Query("Select username FROM user INNER JOIN client_user ON client_user.user_fk = user.id WHERE client_user.user_fk = (?)", &clientData.ClientsGuid)
 			if err != nil {
 				log.Error("Failed to select certain data in the database! ", err)
 			}
-			for rows_UserFK.Next() {
-				err := rows_UserFK.Scan(&query_parametrs.Username)
+			for rowsUserFk.Next() {
+				err := rowsUserFk.Scan(&queryParametrs.Username)
 				if err != nil {
 					log.Error("The structures does not match! ", err)
 				}
 			}
-			All_ClientGuid = append(All_ClientGuid, Query_Parametrs{Username: query_parametrs.Username})
+			allClientGuid = append(allClientGuid, QueryParametrs{Username: queryParametrs.Username})
 		}
-		c.JSON(http.StatusOK, All_ClientGuid)
+		c.JSON(http.StatusOK, allClientGuid)
 	}
 
 }
 
-func User_fk(username, guid string) (c *gin.Context) {
-	var data_client Data_Client
-	DB := db.InitDB()
+func GetUserfk(username, guid string) (c *gin.Context) {
+	var dataClient DataClient
+	DB := db.Connect()
 	tx, err := DB.Begin()
 	if err != nil {
 		log.Error("Failed to connect to database! ", err)
@@ -172,7 +172,7 @@ func User_fk(username, guid string) (c *gin.Context) {
 	}
 
 	for id.Next() {
-		err := id.Scan(&data_client.Username)
+		err := id.Scan(&dataClient.Username)
 		if err != nil {
 			log.Error("The structures does not match! ", err)
 		}
@@ -184,7 +184,7 @@ func User_fk(username, guid string) (c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, err)
 	}
 
-	_, err = insert2.Exec(guid, data_client.Username)
+	_, err = insert2.Exec(guid, dataClient.Username)
 	if err != nil {
 		log.Error("Failed to execute data in the database! ", err)
 		c.JSON(http.StatusInternalServerError, err)

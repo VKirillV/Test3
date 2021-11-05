@@ -14,7 +14,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func InitDB() *sql.DB {
+func Connect() *sql.DB {
 
 	var err error
 
@@ -42,5 +42,6 @@ func InitDB() *sql.DB {
 	if err := DB.Ping(); err != nil {
 		log.Error("DB.Ping = ", err)
 	}
+
 	return DB
 }
