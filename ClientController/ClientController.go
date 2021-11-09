@@ -37,35 +37,28 @@ func PostClientController(c *gin.Context) {
 	var username string = c.Param("username")
 	var guid string = c.Param("guid")
 	var dataClient DataClient
-
+	var userFk UserFk
 	tx, err := db.Connect().Begin()
 	if Error.Error(c, err) {
 		log.Error("Failed to connect to database! ", err)
 		return
 	}
 
-	defer tx.Rollback()
-
-	id, err := tx.Query("Select username FROM user WHERE username = (?)", username)
+	id, err := tx.Query("Select id, username FROM user WHERE username = (?)", username)
 	if Error.Error(c, err) {
 		log.Error("Failed to select certain data in the database! ", err)
 		return
 	}
 
 	for id.Next() {
-		err := id.Scan(&dataClient.Username)
+		err := id.Scan(&userFk.UserFk, &dataClient.Username)
 		if Error.Error(c, err) {
 			log.Error("The structures does not match! ", err)
 			return
 		}
 	}
 
-	if dataClient.Username == username {
-
-		GetId(dataClient.Username, guid)
-
-	} else if dataClient.Username != username {
-
+	if userFk.UserFk == 0 {
 		insert, err := tx.Prepare("INSERT INTO user(username, user_type) VALUES(?, ?)")
 		if Error.Error(c, err) {
 			log.Error("Failed to insert data in the database! ", err)
@@ -77,12 +70,33 @@ func PostClientController(c *gin.Context) {
 			log.Error("Failed to execute data in the database! ", err)
 			return
 		}
-
-		defer GetId(username, guid)
-
-		tx.Commit()
-
 	}
+	id, err = tx.Query("Select id FROM user WHERE username = (?)", username)
+	if Error.Error(c, err) {
+		log.Error("Failed to select certain data in the database! ", err)
+		return
+	}
+
+	for id.Next() {
+		err := id.Scan(&userFk.UserFk)
+		if Error.Error(c, err) {
+			log.Error("The structures does not match! ", err)
+			return
+		}
+	}
+	insert2, err := tx.Prepare("INSERT INTO client_user(client_guid, user_fk) VALUES(?, ?)")
+	if Error.Error(c, err) {
+		log.Error("Failed to insert data in the database! ", err)
+		return
+	}
+	defer insert2.Close()
+	_, err = insert2.Exec(guid, userFk.UserFk)
+	if Error.Error(c, err) {
+		log.Error("Failed to execute data in the database! ", err)
+		return
+	}
+
+	tx.Commit()
 }
 
 func DeleteClientController(c *gin.Context) {
@@ -137,7 +151,7 @@ func GetClientController(c *gin.Context) {
 	}
 
 	if clientGuid == "Guest" {
-		rows, err := tx.Query("Select i, username FROM user WHERE user_type = (?)", client)
+		rows, err := tx.Query("Select id, username FROM user WHERE user_type = (?)", client)
 		if Error.Error(c, err) {
 			log.Error("Failed to select certain data in the database! ", err)
 			return
@@ -196,53 +210,4 @@ func GetClientController(c *gin.Context) {
 		c.JSON(http.StatusOK, allClientGuid)
 	}
 
-}
-
-func GetUserfk(guid string, id int) (c *gin.Context) {
-
-	tx, err := db.Connect().Begin()
-	if Error.Error(c, err) {
-		log.Error("Failed to connect to database! ", err)
-		return
-	}
-
-	insert2, err := tx.Prepare("INSERT INTO client_user(client_guid, user_fk) VALUES(?, ?)")
-	if Error.Error(c, err) {
-		log.Error("Failed to insert data in the database! ", err)
-		return
-	}
-	defer insert2.Close()
-	_, err = insert2.Exec(guid, id)
-	if Error.Error(c, err) {
-		log.Error("Failed to execute data in the database! ", err)
-		return
-	}
-
-	tx.Commit()
-
-	return
-}
-
-func GetId(username, guid string) (c *gin.Context) {
-	var userFk UserFk
-	tx, err := db.Connect().Begin()
-	if Error.Error(c, err) {
-		log.Error("Failed to connect to database! ", err)
-		return
-	}
-	id, err := tx.Query("Select id FROM user WHERE username = (?)", username)
-	if Error.Error(c, err) {
-		log.Error("Failed to select certain data in the database! ", err)
-		return
-	}
-
-	for id.Next() {
-		err := id.Scan(&userFk.UserFk)
-		if Error.Error(c, err) {
-			log.Error("The structures does not match! ", err)
-			return
-		}
-		GetUserfk(guid, userFk.UserFk)
-	}
-	return
 }
