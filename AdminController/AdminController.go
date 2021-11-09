@@ -1,7 +1,6 @@
 package AdminController
 
 import (
-	"database/sql"
 	Error "library/JsonError"
 	"library/db"
 	"net/http"
@@ -28,22 +27,20 @@ const (
 	admin  UserType = "Admin"
 )
 
-var DB *sql.DB
-
 func PostAdminController(c *gin.Context) {
 	var dataAdmin DataAdmin
-	DB := db.Connect()
 	var adminname string = c.Param("adminname")
-	tx, err := DB.Begin()
+	tx, err := db.Connect().Begin()
 	if Error.Error(c, err) {
 		log.Error("Failed to connect to database! ", err)
 		return
 	}
 	defer tx.Rollback()
 
-	rows, err := DB.Query("Select username FROM user WHERE username = (?)", adminname)
-	if err != nil {
+	rows, err := tx.Query("Select username FROM user WHERE username = (?)", adminname)
+	if Error.Error(c, err) {
 		log.Error("Failed to select certain data in the database! ", err)
+		return
 	}
 
 	for rows.Next() {
@@ -54,7 +51,7 @@ func PostAdminController(c *gin.Context) {
 	}
 
 	if dataAdmin.Username == adminname {
-		update, err := DB.Prepare("UPDATE test2.user SET user_type = (?) WHERE username = (?)")
+		update, err := tx.Prepare("UPDATE user SET user_type = (?) WHERE username = (?)")
 		if Error.Error(c, err) {
 			log.Error("Failed to update data in the database! ", err)
 			return
@@ -89,14 +86,13 @@ func PostAdminController(c *gin.Context) {
 
 func DeleteAdminController(c *gin.Context) {
 	var adminname string = c.Param("adminname")
-	DB := db.Connect()
-	tx, err := DB.Begin()
+	tx, err := db.Connect().Begin()
 	if Error.Error(c, err) {
 		log.Error("Failed to connect to database! ", err)
 		return
 	}
 	defer tx.Rollback()
-	update, err := tx.Prepare("UPDATE test2.user SET user_type = (?) WHERE username = (?)")
+	update, err := tx.Prepare("UPDATE user SET user_type = (?) WHERE username = (?)")
 	if Error.Error(c, err) {
 		log.Error("Failed to update data in the database! ", err)
 		return
@@ -113,11 +109,16 @@ func DeleteAdminController(c *gin.Context) {
 
 func GetAdminController(c *gin.Context) {
 	var dataAdmin DataAdmin
-	DB := db.Connect()
+	tx, err := db.Connect().Begin()
+	if Error.Error(c, err) {
+		log.Error("Failed to connect to database! ", err)
+		return
+	}
 
-	rows, err := DB.Query("Select username FROM user WHERE user_type = (?)", admin)
-	if err != nil {
+	rows, err := tx.Query("Select username FROM user WHERE user_type = (?)", admin)
+	if Error.Error(c, err) {
 		log.Error("Failed to select certain data in the database! ", err)
+		return
 	}
 	var allAdmin []DataAdmin
 	for rows.Next() {

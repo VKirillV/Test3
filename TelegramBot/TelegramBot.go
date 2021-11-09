@@ -1,9 +1,11 @@
 package TelegramBot
 
 import (
+	Error "library/JsonError"
 	Notification "library/NotificationService"
 	"library/db"
 
+	"github.com/gin-gonic/gin"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	log "github.com/sirupsen/logrus"
 )
@@ -13,11 +15,16 @@ type Data struct {
 	TelegramChatId int
 }
 
-func Start(startBot *tgbotapi.BotAPI) {
+func Start(startBot *tgbotapi.BotAPI) (c *gin.Context) {
 	log.Info("GoGinBot is starting...")
 	var data Data
 	client := "Client"
-	DB := db.Connect()
+
+	tx, err := db.Connect().Begin()
+	if Error.Error(c, err) {
+		log.Error("Failed to connect to database! ", err)
+		return
+	}
 
 	u := tgbotapi.NewUpdate(0)
 	updates, err := startBot.GetUpdatesChan(u)
@@ -33,7 +40,7 @@ func Start(startBot *tgbotapi.BotAPI) {
 		messageChatId := update.Message.Chat.ID
 		botSelfId := startBot.Self.ID
 
-		rows, err := DB.Query("Select username, telegram_chat_id FROM user WHERE username = (?)", telegramUser)
+		rows, err := tx.Query("Select username, telegram_chat_id FROM user WHERE username = (?)", telegramUser)
 		if err != nil {
 			log.Error("Failed to select certain data in the database! ", err)
 		}
@@ -47,7 +54,7 @@ func Start(startBot *tgbotapi.BotAPI) {
 
 		if data.Username == telegramUser {
 			if data.TelegramChatId == 0 {
-				update, err := DB.Prepare("UPDATE test2.user SET telegram_chat_id = (?) WHERE username = (?)")
+				update, err := tx.Prepare("UPDATE user SET telegram_chat_id = (?) WHERE username = (?)")
 				if err != nil {
 					log.Error("Failed to update data in the database! ", err)
 				}
@@ -76,7 +83,7 @@ func Start(startBot *tgbotapi.BotAPI) {
 
 		} else if data.Username != telegramUser {
 
-			_, err := DB.Query("INSERT INTO user(username, user_type, telegram_chat_id) VALUES (?, ?, ?)", telegramUser, client, botSelfId)
+			_, err := tx.Query("INSERT INTO user(username, user_type, telegram_chat_id) VALUES (?, ?, ?)", telegramUser, client, botSelfId)
 			if err != nil {
 				log.Error("Failed to insert data in the database! ", err)
 			}
@@ -90,4 +97,5 @@ func Start(startBot *tgbotapi.BotAPI) {
 			Notification.SendMessage(messageChatId, telegramUser, botSelfId)
 		}
 	}
+	return
 }

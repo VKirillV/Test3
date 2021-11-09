@@ -13,6 +13,7 @@ import (
 )
 
 func main() {
+
 	go start.ConnectBot()
 	fmt.Println("Server is starting...")
 
@@ -26,7 +27,6 @@ func main() {
 	r.DELETE("/:username/client/:guid", ClientController.DeleteClientController)
 	r.GET("/admin", AdminController.GetAdminController)
 	r.GET("/client", ClientController.GetClientController)
-
 	r.Run(port_server)
 
 }
