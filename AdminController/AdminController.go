@@ -2,6 +2,7 @@ package AdminController
 
 import (
 	Error "library/JsonError"
+	Select "library/SelectMethod"
 	"library/db"
 	"net/http"
 
@@ -14,12 +15,6 @@ type DataAdmin struct {
 	Username string `json:"username"`
 }
 
-type Data_Client struct {
-	Username string `json:"username"`
-	Usertype string `json:"usertype"`
-	Clients  string `json:"clients"`
-}
-
 type UserType string
 
 const (
@@ -28,7 +23,6 @@ const (
 )
 
 func PostAdminController(c *gin.Context) {
-	var dataAdmin DataAdmin
 	var adminname string = c.Param("adminname")
 	tx, err := db.Connect().Begin()
 	if Error.Error(c, err) {
@@ -36,52 +30,33 @@ func PostAdminController(c *gin.Context) {
 		return
 	}
 	defer tx.Rollback()
-
-	rows, err := tx.Query("Select username FROM user WHERE username = (?)", adminname)
-	if Error.Error(c, err) {
-		log.Error("Failed to select certain data in the database! ", err)
-		return
-	}
-
-	for rows.Next() {
-		err := rows.Scan(&dataAdmin.Username)
-		if err != nil {
-			log.Error("The structures does not match! ", err)
+	id := Select.ID(tx, c, adminname)
+	if id == nil {
+		insert, err := tx.Prepare("INSERT INTO user(username, user_type) VALUES(?, ?)")
+		if Error.Error(c, err) {
+			log.Error("Failed to insert data in the database! ", err)
+			return
 		}
-	}
-
-	if dataAdmin.Username == adminname {
+		defer insert.Close()
+		_, err = insert.Exec(adminname, admin)
+		if Error.Error(c, err) {
+			log.Error("Failed to execute data in the database! ", err)
+			return
+		}
+	} else if id != nil {
 		update, err := tx.Prepare("UPDATE user SET user_type = (?) WHERE username = (?)")
 		if Error.Error(c, err) {
 			log.Error("Failed to update data in the database! ", err)
 			return
 		}
 		defer update.Close()
-
 		_, err = update.Exec(admin, adminname)
 		if Error.Error(c, err) {
 			log.Error("Failed to execute data in the database! ", err)
 			return
 		}
-
-	} else if dataAdmin.Username != adminname {
-
-		insert, err := tx.Prepare("INSERT INTO user(username, user_type) VALUES(?, ?)")
-		if Error.Error(c, err) {
-			log.Error("Failed to insert data in the database! ", err)
-			return
-		}
-
-		defer insert.Close()
-
-		_, err = insert.Exec(adminname, admin)
-		if Error.Error(c, err) {
-			log.Error("Failed to execute data in the database! ", err)
-			return
-		}
-		tx.Commit()
-
 	}
+	tx.Commit()
 }
 
 func DeleteAdminController(c *gin.Context) {
@@ -98,7 +73,6 @@ func DeleteAdminController(c *gin.Context) {
 		return
 	}
 	defer update.Close()
-
 	_, err = update.Exec(client, adminname)
 	if Error.Error(c, err) {
 		log.Error("Failed to execute data in the database! ", err)
@@ -114,7 +88,6 @@ func GetAdminController(c *gin.Context) {
 		log.Error("Failed to connect to database! ", err)
 		return
 	}
-
 	rows, err := tx.Query("Select username FROM user WHERE user_type = (?)", admin)
 	if Error.Error(c, err) {
 		log.Error("Failed to select certain data in the database! ", err)
@@ -129,5 +102,4 @@ func GetAdminController(c *gin.Context) {
 		allAdmin = append(allAdmin, DataAdmin{Username: dataAdmin.Username})
 	}
 	c.JSON(http.StatusOK, allAdmin)
-
 }

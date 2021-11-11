@@ -2,6 +2,8 @@ package ClientController
 
 import (
 	Error "library/JsonError"
+	Select "library/SelectMethod"
+
 	"library/db"
 	"net/http"
 
@@ -10,9 +12,7 @@ import (
 )
 
 type DataClient struct {
-	Username string   `json:"username"`
-	Usertype string   `json:"usertype"`
-	Clients  []string `json:"clients"`
+	Username string `json:"username"`
 }
 
 type ClientData struct {
@@ -23,9 +23,7 @@ type ClientData struct {
 type QueryParametrs struct {
 	Username string `json:"username"`
 }
-type UserFk struct {
-	UserFk int
-}
+
 type UserType string
 
 const (
@@ -36,29 +34,14 @@ const (
 func PostClientController(c *gin.Context) {
 	var username string = c.Param("username")
 	var guid string = c.Param("guid")
-	var dataClient DataClient
-	var userFk UserFk
 	tx, err := db.Connect().Begin()
 	if Error.Error(c, err) {
 		log.Error("Failed to connect to database! ", err)
 		return
 	}
-
-	id, err := tx.Query("Select id, username FROM user WHERE username = (?)", username)
-	if Error.Error(c, err) {
-		log.Error("Failed to select certain data in the database! ", err)
-		return
-	}
-
-	for id.Next() {
-		err := id.Scan(&userFk.UserFk, &dataClient.Username)
-		if Error.Error(c, err) {
-			log.Error("The structures does not match! ", err)
-			return
-		}
-	}
-
-	if userFk.UserFk == 0 {
+	defer tx.Rollback()
+	id := Select.ID(tx, c, username)
+	if id == nil {
 		insert, err := tx.Prepare("INSERT INTO user(username, user_type) VALUES(?, ?)")
 		if Error.Error(c, err) {
 			log.Error("Failed to insert data in the database! ", err)
@@ -71,143 +54,90 @@ func PostClientController(c *gin.Context) {
 			return
 		}
 	}
-	id, err = tx.Query("Select id FROM user WHERE username = (?)", username)
-	if Error.Error(c, err) {
-		log.Error("Failed to select certain data in the database! ", err)
-		return
-	}
-
-	for id.Next() {
-		err := id.Scan(&userFk.UserFk)
-		if Error.Error(c, err) {
-			log.Error("The structures does not match! ", err)
-			return
-		}
-	}
+	id = Select.ID(tx, c, username)
 	insert2, err := tx.Prepare("INSERT INTO client_user(client_guid, user_fk) VALUES(?, ?)")
 	if Error.Error(c, err) {
 		log.Error("Failed to insert data in the database! ", err)
 		return
 	}
 	defer insert2.Close()
-	_, err = insert2.Exec(guid, userFk.UserFk)
+	_, err = insert2.Exec(guid, id)
 	if Error.Error(c, err) {
 		log.Error("Failed to execute data in the database! ", err)
 		return
 	}
 
 	tx.Commit()
+
 }
 
 func DeleteClientController(c *gin.Context) {
-	var dataClient DataClient
 	var username string = c.Param("username")
+	var guid string = c.Param("guid")
 	tx, err := db.Connect().Begin()
 	if Error.Error(c, err) {
 		log.Error("Failed to connect to database! ", err)
 		return
 	}
-
 	defer tx.Rollback()
-
-	id, err := tx.Query("Select id FROM user WHERE username = (?)", username)
+	id := Select.ID(tx, c, username)
+	statement, err := db.Connect().Prepare("DELETE client_user FROM client_user " +
+		"JOIN user ON user.id = client_user.user_fk AND client_user.client_guid = (?) " +
+		"WHERE user.id = (?)")
 	if Error.Error(c, err) {
-		log.Error("Failed to select certain data in the database! ", err)
+		log.Error("Failed to delete data in the database! ", err)
 		return
 	}
-
-	for id.Next() {
-		err := id.Scan(&dataClient.Username)
-		if Error.Error(c, err) {
-			log.Error("The structures does not match! ", err)
-			return
-		}
-		delete, err := db.Connect().Prepare("DELETE client_user FROM client_user INNER JOIN user ON user.id = client_user.user_fk WHERE user.id= (?)")
-		if Error.Error(c, err) {
-			log.Error("Failed to delete data in the database! ", err)
-			return
-		}
-		defer delete.Close()
-		_, err = delete.Exec(dataClient.Username)
-		if Error.Error(c, err) {
-			log.Error("Failed to execute data in the database! ", err)
-			return
-		}
-		tx.Commit()
+	defer statement.Close()
+	_, err = statement.Exec(guid, id)
+	if Error.Error(c, err) {
+		log.Error("Failed to execute data in the database! ", err)
+		return
 	}
+	tx.Commit()
 }
 
 func GetClientController(c *gin.Context) {
 	var dataClient DataClient
-	var clientData ClientData
 	var queryParametrs QueryParametrs
 	var allClient []DataClient
 	var allClientGuid []QueryParametrs
-	clientGuid := c.DefaultQuery("client_guid", "Guest")
-	tx, err := db.Connect().Begin()
-	if Error.Error(c, err) {
-		log.Error("Failed to connect to database! ", err)
-		return
-	}
+	clientGuid := c.Query("client_guid")
 
-	if clientGuid == "Guest" {
-		rows, err := tx.Query("Select id, username FROM user WHERE user_type = (?)", client)
+	if len(clientGuid) == 0 {
+		rows2, err := db.Connect().Query(
+			"Select DISTINCT username FROM user "+
+				"LEFT JOIN client_user ON user.id = client_user.user_fk AND user_type = (?) "+
+				"WHERE client_user.user_fk IS NOT NULL", client)
+		if Error.Error(c, err) {
+			log.Error("Failed to select certain data in the database! ", err)
+			return
+		}
+		for rows2.Next() {
+			err2 := rows2.Scan(&dataClient.Username)
+			if Error.Error(c, err2) {
+				log.Error("The structures does not match! ", err)
+				return
+			}
+			allClient = append(allClient, DataClient{Username: string(dataClient.Username)})
+		}
+		c.JSON(http.StatusOK, allClient)
+	} else {
+		rows, err := db.Connect().Query("Select DISTINCT username FROM user "+
+			"LEFT JOIN client_user ON user.id = client_user.user_fk "+
+			"WHERE client_user.client_guid = (?)", clientGuid)
 		if Error.Error(c, err) {
 			log.Error("Failed to select certain data in the database! ", err)
 			return
 		}
 		for rows.Next() {
-			err := rows.Scan(&clientData.ClientsGuid, &dataClient.Username)
+			err := rows.Scan(&queryParametrs.Username)
 			if Error.Error(c, err) {
 				log.Error("The structures does not match! ", err)
 				return
-			}
-			rows2, err := db.Connect().Query("Select client_guid FROM client_user INNER JOIN user ON user.id = client_user.user_fk WHERE user.id = (?)", clientData.ClientsGuid)
-			if Error.Error(c, err) {
-				log.Error("Failed to select certain data in the database! ", err)
-				return
-			}
-			allClientGuid := []string{}
-			for rows2.Next() {
-				err2 := rows2.Scan(&clientData.GuidArray)
-				if Error.Error(c, err2) {
-					log.Error("The structures does not match! ", err)
-					return
-				}
-				allClientGuid = append(allClientGuid, clientData.GuidArray)
-			}
-			allClient = append(allClient, DataClient{Username: string(dataClient.Username), Usertype: string(client), Clients: allClientGuid})
-		}
-		c.JSON(http.StatusOK, allClient)
-	} else {
-
-		rowsGuid, err := tx.Query("Select user_fk FROM client_user WHERE client_guid = (?)", clientGuid)
-		if Error.Error(c, err) {
-			log.Error("Failed to select certain data in the database! ", err)
-			return
-		}
-
-		for rowsGuid.Next() {
-			err := rowsGuid.Scan(&clientData.ClientsGuid)
-			if Error.Error(c, err) {
-				log.Error("The structures does not match! ", err)
-				return
-			}
-			rowsUserFk, err := db.Connect().Query("Select username FROM user INNER JOIN client_user ON client_user.user_fk = user.id WHERE client_user.user_fk = (?)", &clientData.ClientsGuid)
-			if Error.Error(c, err) {
-				log.Error("Failed to select certain data in the database! ", err)
-				return
-			}
-			for rowsUserFk.Next() {
-				err := rowsUserFk.Scan(&queryParametrs.Username)
-				if Error.Error(c, err) {
-					log.Error("The structures does not match! ", err)
-					return
-				}
 			}
 			allClientGuid = append(allClientGuid, QueryParametrs{Username: queryParametrs.Username})
 		}
 		c.JSON(http.StatusOK, allClientGuid)
 	}
-
 }

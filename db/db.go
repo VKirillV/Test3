@@ -24,7 +24,8 @@ func Connect() *sql.DB {
 	db_pass := os.Getenv("db_pass")
 	db_port := os.Getenv("db_port")
 
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8", string(db_user), string(db_pass), string(db_host), string(db_port), string(db_name))
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8", string(db_user), string(db_pass),
+		string(db_host), string(db_port), string(db_name))
 	DB, err := sql.Open("mysql", dsn)
 	if err != nil {
 		log.Panic("Failed to connect to database: ", err)
