@@ -53,8 +53,9 @@ func PostClientController(c *gin.Context) {
 			log.Error("Failed to execute data in the database! ", err)
 			return
 		}
+		id = Select.ID(tx, c, username)
 	}
-	id = Select.ID(tx, c, username)
+
 	insert2, err := tx.Prepare("INSERT INTO client_user(client_guid, user_fk) VALUES(?, ?)")
 	if Error.Error(c, err) {
 		log.Error("Failed to insert data in the database! ", err)
@@ -66,9 +67,7 @@ func PostClientController(c *gin.Context) {
 		log.Error("Failed to execute data in the database! ", err)
 		return
 	}
-
 	tx.Commit()
-
 }
 
 func DeleteClientController(c *gin.Context) {
@@ -80,16 +79,15 @@ func DeleteClientController(c *gin.Context) {
 		return
 	}
 	defer tx.Rollback()
-	id := Select.ID(tx, c, username)
 	statement, err := db.Connect().Prepare("DELETE client_user FROM client_user " +
-		"JOIN user ON user.id = client_user.user_fk AND client_user.client_guid = (?) " +
-		"WHERE user.id = (?)")
+		"JOIN user ON user.id = client_user.user_fk " +
+		"WHERE user.username = (?) AND client_user.client_guid = (?)")
 	if Error.Error(c, err) {
 		log.Error("Failed to delete data in the database! ", err)
 		return
 	}
 	defer statement.Close()
-	_, err = statement.Exec(guid, id)
+	_, err = statement.Exec(username, guid)
 	if Error.Error(c, err) {
 		log.Error("Failed to execute data in the database! ", err)
 		return
@@ -102,6 +100,12 @@ func GetClientController(c *gin.Context) {
 	var queryParametrs QueryParametrs
 	var allClient []DataClient
 	var allClientGuid []QueryParametrs
+	// clientGuid, err := c.Request.URL.Query()["client_guid"]
+	// if !err || len(clientGuid[0]) < 1 {
+	//     log.Error("Url Param 'key' is missing")
+	//     return
+	// }
+
 	clientGuid := c.Query("client_guid")
 
 	if len(clientGuid) == 0 {

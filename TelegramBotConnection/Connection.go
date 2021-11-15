@@ -11,20 +11,15 @@ import (
 )
 
 func ConnectBot() {
-	tokenNotificatioin := os.Getenv("NOTIFICATION_TOKEN")
 	token := os.Getenv("TOKEN")
-
-	notificationBot, err := tgbotapi.NewBotAPI(tokenNotificatioin)
-	if err != nil {
-		log.Error(err)
-	}
 	startBot, err := tgbotapi.NewBotAPI(token)
 	if err != nil {
-		log.Error(err)
+		log.Panic(err)
 	}
+
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
-	startBot.Debug, notificationBot.Debug = true, true
+	startBot.Debug = true
 	TelegramBot.Start(startBot)
 
 }

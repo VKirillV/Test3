@@ -2,7 +2,7 @@ package TelegramBot
 
 import (
 	Error "library/JsonError"
-	Notification "library/NotificationService"
+
 	"library/db"
 
 	"github.com/gin-gonic/gin"
@@ -18,7 +18,6 @@ type Data struct {
 func Start(startBot *tgbotapi.BotAPI) (c *gin.Context) {
 	log.Info("GoGinBot is starting...")
 	var data Data
-	client := "Client"
 
 	tx, err := db.Connect().Begin()
 	if Error.Error(c, err) {
@@ -58,7 +57,6 @@ func Start(startBot *tgbotapi.BotAPI) (c *gin.Context) {
 				if err != nil {
 					log.Error("Failed to update data in the database! ", err)
 				}
-
 				_, err = update.Exec(botSelfId, data.Username)
 				if err != nil {
 					log.Error("Failed to update data in the database! ", err)
@@ -70,32 +68,18 @@ func Start(startBot *tgbotapi.BotAPI) (c *gin.Context) {
 				} else if err != nil {
 					log.Errorf("Message delivery failed to user %s with error: %s", telegramUser, err)
 				}
-				Notification.SendMessage(messageChatId, telegramUser, botSelfId)
-			} else {
-				msg := tgbotapi.NewMessage(messageChatId, "You are registered")
-				_, err = startBot.Send(msg)
-				if err == nil {
-					log.Infof("Message successfully delivered to %s", telegramUser)
-				} else if err != nil {
-					log.Errorf("Message delivery failed to user %s with error: %s", telegramUser, err)
-				}
+				continue
 			}
 
-		} else if data.Username != telegramUser {
-
-			_, err := tx.Query("INSERT INTO user(username, user_type, telegram_chat_id) VALUES (?, ?, ?)", telegramUser, client, botSelfId)
-			if err != nil {
-				log.Error("Failed to insert data in the database! ", err)
-			}
-			msg := tgbotapi.NewMessage(messageChatId, "Successfully subscribed on updates")
+			msg := tgbotapi.NewMessage(messageChatId, "You are registered")
 			_, err = startBot.Send(msg)
 			if err == nil {
 				log.Infof("Message successfully delivered to %s", telegramUser)
 			} else if err != nil {
 				log.Errorf("Message delivery failed to user %s with error: %s", telegramUser, err)
 			}
-			Notification.SendMessage(messageChatId, telegramUser, botSelfId)
 		}
 	}
+
 	return
 }

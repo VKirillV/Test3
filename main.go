@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"library/AdminController"
 	"library/ClientController"
+	"library/NotificationController"
 	start "library/TelegramBotConnection"
 	"os"
 
@@ -27,6 +28,8 @@ func main() {
 	r.DELETE("/:username/client/:guid", ClientController.DeleteClientController)
 	r.GET("/admin", AdminController.GetAdminController)
 	r.GET("/client", ClientController.GetClientController)
+	r.POST("/admin/:notification", NotificationController.GetAdminNotificationController)
+	r.POST("/client/:notification", NotificationController.GetClientNotificationController)
 	r.Run(port_server)
 
 }
