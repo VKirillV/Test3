@@ -1,9 +1,11 @@
 package TelegramBot
 
 import (
-	Error "library/JsonError"
-
+	"database/sql"
+	"fmt"
 	"library/db"
+	"net/http"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
@@ -15,49 +17,32 @@ type Data struct {
 	TelegramChatId int
 }
 
-func Start(startBot *tgbotapi.BotAPI) (c *gin.Context) {
+func Start(startBot *tgbotapi.BotAPI, tx *sql.Tx, c *gin.Context) {
 	log.Info("GoGinBot is starting...")
-	var data Data
-
-	tx, err := db.Connect().Begin()
-	if Error.Error(c, err) {
-		log.Error("Failed to connect to database! ", err)
-		return
-	}
-
+	var telegramUser string
+	var messageChatId int64
 	u := tgbotapi.NewUpdate(0)
 	updates, err := startBot.GetUpdatesChan(u)
 	if err != nil {
 		log.Error(err)
 	}
-
 	for update := range updates {
 		if update.Message == nil {
 			continue
 		}
-		telegramUser := update.Message.From.UserName
-		messageChatId := update.Message.Chat.ID
-		botSelfId := startBot.Self.ID
-
-		rows, err := tx.Query("Select username, telegram_chat_id FROM user WHERE username = (?)", telegramUser)
-		if err != nil {
-			log.Error("Failed to select certain data in the database! ", err)
+		telegramUser = update.Message.From.UserName
+		if len(telegramUser) == 0 {
+			continue
 		}
-
-		for rows.Next() {
-			err := rows.Scan(&data.Username, &data.TelegramChatId)
-			if err != nil {
-				log.Error("The structures does not match! ", err)
-			}
-		}
-
-		if data.Username == telegramUser {
-			if data.TelegramChatId == 0 {
-				update, err := tx.Prepare("UPDATE user SET telegram_chat_id = (?) WHERE username = (?)")
+		messageChatId = update.Message.Chat.ID
+		username, telegramChatId := PrepareChatId(telegramUser)
+		if username == telegramUser {
+			if telegramChatId == 0 {
+				update, err := db.Connect().Prepare("UPDATE user SET telegram_chat_id = (?) WHERE username = (?)")
 				if err != nil {
 					log.Error("Failed to update data in the database! ", err)
 				}
-				_, err = update.Exec(botSelfId, data.Username)
+				_, err = update.Exec(messageChatId, username)
 				if err != nil {
 					log.Error("Failed to update data in the database! ", err)
 				}
@@ -68,18 +53,58 @@ func Start(startBot *tgbotapi.BotAPI) (c *gin.Context) {
 				} else if err != nil {
 					log.Errorf("Message delivery failed to user %s with error: %s", telegramUser, err)
 				}
-				continue
-			}
 
-			msg := tgbotapi.NewMessage(messageChatId, "You are registered")
-			_, err = startBot.Send(msg)
-			if err == nil {
-				log.Infof("Message successfully delivered to %s", telegramUser)
-			} else if err != nil {
-				log.Errorf("Message delivery failed to user %s with error: %s", telegramUser, err)
+			} else {
+				msg := tgbotapi.NewMessage(messageChatId, "You are registered")
+				_, err = startBot.Send(msg)
+				if err == nil {
+					log.Infof("Message successfully delivered to %s", telegramUser)
+				} else if err != nil {
+					log.Errorf("Message delivery failed to user %s with error: %s", telegramUser, err)
+
+				}
 			}
 		}
 	}
+}
 
-	return
+func SendMessage(notification string, usertype string) {
+	token := os.Getenv("TOKEN")
+	fmt.Println(usertype)
+	rows, err := db.Connect().Query("Select telegram_chat_id FROM user WHERE user_type = (?) AND telegram_chat_id IS NOT NULL", usertype)
+	if err != nil {
+		log.Error("Failed to select certain data in the database", err)
+	}
+	for rows.Next() {
+		var messageChatId int64
+		var url string
+		err := rows.Scan(&messageChatId)
+		if err != nil {
+			log.Error("The structures does not match! ", err)
+		}
+		fmt.Println(messageChatId)
+		url = fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage?chat_id=%d&text=%s", token, messageChatId, notification)
+		_, err = http.Get(url)
+		if err == nil {
+			log.Infof("Message successfully delivered to ")
+		} else if err != nil {
+			log.Errorf("Message delivery failed to user %s with error: %s") //!!!!!!!!!!
+		}
+	}
+}
+
+func PrepareChatId(telegramUser string) (username string, telegramChatId int) {
+	var data Data
+	rows, err := db.Connect().Query("Select username, telegram_chat_id FROM user WHERE username = (?)", telegramUser)
+	if err != nil {
+		log.Error("Failed to select certain data in the database! ", err)
+	}
+	for rows.Next() {
+		err := rows.Scan(&data.Username, &data.TelegramChatId)
+		if err != nil {
+			log.Error("The structures does not match! ", err)
+		}
+		fmt.Println(data.Username, data.TelegramChatId)
+	}
+	return data.Username, data.TelegramChatId
 }

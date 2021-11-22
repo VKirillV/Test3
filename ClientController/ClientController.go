@@ -100,15 +100,10 @@ func GetClientController(c *gin.Context) {
 	var queryParametrs QueryParametrs
 	var allClient []DataClient
 	var allClientGuid []QueryParametrs
-	// clientGuid, err := c.Request.URL.Query()["client_guid"]
-	// if !err || len(clientGuid[0]) < 1 {
-	//     log.Error("Url Param 'key' is missing")
-	//     return
-	// }
-
 	clientGuid := c.Query("client_guid")
 
 	if len(clientGuid) == 0 {
+
 		rows2, err := db.Connect().Query(
 			"Select DISTINCT username FROM user "+
 				"LEFT JOIN client_user ON user.id = client_user.user_fk AND user_type = (?) "+
