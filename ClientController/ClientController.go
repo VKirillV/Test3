@@ -101,7 +101,6 @@ func GetClientController(c *gin.Context) {
 	var allClient []DataClient
 	var allClientGuid []QueryParametrs
 	clientGuid := c.Query("client_guid")
-
 	if len(clientGuid) == 0 {
 
 		rows2, err := db.Connect().Query(
@@ -122,6 +121,7 @@ func GetClientController(c *gin.Context) {
 		}
 		c.JSON(http.StatusOK, allClient)
 	} else {
+
 		rows, err := db.Connect().Query("Select DISTINCT username FROM user "+
 			"LEFT JOIN client_user ON user.id = client_user.user_fk "+
 			"WHERE client_user.client_guid = (?)", clientGuid)
