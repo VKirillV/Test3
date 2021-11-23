@@ -71,7 +71,8 @@ func Start(startBot *tgbotapi.BotAPI, tx *sql.Tx, c *gin.Context) {
 
 func SendMessage(notification string, usertype string) {
 	token := os.Getenv("TOKEN")
-	rows, err := db.Connect().Query("Select telegram_chat_id FROM user WHERE user_type = (?) AND telegram_chat_id IS NOT NULL", usertype)
+	rows, err := db.Connect().Query("Select telegram_chat_id, username FROM user"+
+		"WHERE user_type = (?) AND telegram_chat_id IS NOT NULL", usertype)
 	if err != nil {
 		log.Error("Failed to select certain data in the database", err)
 	}
@@ -79,16 +80,17 @@ func SendMessage(notification string, usertype string) {
 	for rows.Next() {
 		var messageChatId int64
 		var url string
-		err := rows.Scan(&messageChatId)
+		var telegramUser string
+		err := rows.Scan(&messageChatId, &telegramUser)
 		if err != nil {
 			log.Error("The structures does not match! ", err)
 		}
 		url = fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage?chat_id=%d&text=%s", token, messageChatId, notification)
 		_, err = http.Get(url)
 		if err == nil {
-			log.Infof("Message successfully delivered to ")
+			log.Infof("Message successfully delivered to %s", telegramUser)
 		} else if err != nil {
-			log.Errorf("Message delivery failed to user %s with error: %s") //!!!!!!!!!!
+			log.Errorf("Message delivery failed to user %s with error: %s", telegramUser, err)
 		}
 	}
 }
