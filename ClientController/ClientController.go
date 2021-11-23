@@ -100,7 +100,13 @@ func GetClientController(c *gin.Context) {
 	var queryParametrs QueryParametrs
 	var allClient []DataClient
 	var allClientGuid []QueryParametrs
-	clientGuid := c.Query("client_guid")
+	clientGuid, err := c.GetQuery("client_guid")
+	if err == false {
+		log.Info("Mistake in query parameter path! ")
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
+			"error": "Mistake in query parameter path! ",
+		})
+	}
 	if len(clientGuid) == 0 {
 
 		rows2, err := db.Connect().Query(
