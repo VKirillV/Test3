@@ -1,9 +1,9 @@
-package AdminController
+package admincontroller
 
 import (
+	db "library/ConnectionDatabase"
 	Error "library/JsonError"
-	Select "library/SelectMethod"
-	"library/db"
+	take "library/SelectMethod"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -22,84 +22,130 @@ const (
 	admin  UserType = "Admin"
 )
 
-func PostAdminController(c *gin.Context) {
-	var adminname string = c.Param("adminname")
-	tx, err := db.Connect().Begin()
-	if Error.Error(c, err) {
+func PostAdminController(ctx *gin.Context) {
+	adminname := ctx.Param("adminname")
+
+	txn, err := db.Connect().Begin()
+	if Error.Error(ctx, err) {
 		log.Error("Failed to connect to database! ", err)
+
 		return
 	}
-	defer tx.Rollback()
-	id := Select.ID(tx, c, adminname)
-	if id == nil {
-		insert, err := tx.Prepare("INSERT INTO user(username, user_type) VALUES(?, ?)")
-		if Error.Error(c, err) {
+
+	defer func() {
+		err = txn.Rollback()
+		if err != nil {
+			log.Error(err)
+		}
+	}()
+
+	checkID := take.ID(txn, ctx, adminname)
+	if checkID == nil {
+		insert, err := txn.Prepare("INSERT INTO user(username, user_type) VALUES(?, ?)")
+		if Error.Error(ctx, err) {
 			log.Error("Failed to insert data in the database! ", err)
+
 			return
 		}
 		defer insert.Close()
+
 		_, err = insert.Exec(adminname, admin)
-		if Error.Error(c, err) {
+		if Error.Error(ctx, err) {
 			log.Error("Failed to execute data in the database! ", err)
+
 			return
 		}
-	} else if id != nil {
-		update, err := tx.Prepare("UPDATE user SET user_type = (?) WHERE username = (?)")
-		if Error.Error(c, err) {
+	} else {
+		update, err := txn.Prepare("UPDATE user SET user_type = (?) WHERE username = (?)")
+		if Error.Error(ctx, err) {
 			log.Error("Failed to update data in the database! ", err)
+
 			return
 		}
 		defer update.Close()
 		_, err = update.Exec(admin, adminname)
-		if Error.Error(c, err) {
+		if Error.Error(ctx, err) {
 			log.Error("Failed to execute data in the database! ", err)
+
 			return
 		}
 	}
-	tx.Commit()
+
+	err = txn.Commit()
+	if err != nil {
+		log.Error(err)
+	}
 }
 
-func DeleteAdminController(c *gin.Context) {
-	var adminname string = c.Param("adminname")
-	tx, err := db.Connect().Begin()
-	if Error.Error(c, err) {
+func DeleteAdminController(ctx *gin.Context) {
+	adminname := ctx.Param("adminname")
+
+	txn, err := db.Connect().Begin()
+	if Error.Error(ctx, err) {
 		log.Error("Failed to connect to database! ", err)
+
 		return
 	}
-	defer tx.Rollback()
-	update, err := tx.Prepare("UPDATE user SET user_type = (?) WHERE username = (?)")
-	if Error.Error(c, err) {
+
+	defer func() {
+		err = txn.Rollback()
+		if err != nil {
+			log.Error(err)
+		}
+	}()
+
+	update, err := txn.Prepare("UPDATE user SET user_type = (?) WHERE username = (?)")
+	if Error.Error(ctx, err) {
 		log.Error("Failed to update data in the database! ", err)
+
 		return
 	}
 	defer update.Close()
+
 	_, err = update.Exec(client, adminname)
-	if Error.Error(c, err) {
+	if Error.Error(ctx, err) {
 		log.Error("Failed to execute data in the database! ", err)
+
 		return
 	}
-	tx.Commit()
+
+	err = txn.Commit()
+	if err != nil {
+		log.Error(err)
+	}
 }
 
-func GetAdminController(c *gin.Context) {
+func GetAdminController(ctx *gin.Context) {
 	var dataAdmin DataAdmin
-	tx, err := db.Connect().Begin()
-	if Error.Error(c, err) {
+
+	txn, err := db.Connect().Begin()
+	if Error.Error(ctx, err) {
 		log.Error("Failed to connect to database! ", err)
+
 		return
 	}
-	rows, err := tx.Query("Select username FROM user WHERE user_type = (?)", admin)
-	if Error.Error(c, err) {
+
+	rows, err := txn.Query("Select username FROM user WHERE user_type = (?)", admin)
+	if Error.Error(ctx, err) {
 		log.Error("Failed to select certain data in the database! ", err)
+
 		return
 	}
+
+	defer func() {
+		_ = rows.Close()
+		_ = rows.Err()
+	}()
+
 	var allAdmin []DataAdmin
+
 	for rows.Next() {
 		err := rows.Scan(&dataAdmin.Username)
 		if err != nil {
 			log.Error("The structures does not match! ", err)
 		}
+
 		allAdmin = append(allAdmin, DataAdmin{Username: dataAdmin.Username})
 	}
-	c.JSON(http.StatusOK, allAdmin)
+	ctx.JSON(http.StatusOK, allAdmin)
 }

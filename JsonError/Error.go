@@ -1,4 +1,4 @@
-package Error
+package check
 
 import (
 	"net/http"
@@ -8,9 +8,8 @@ import (
 )
 
 func Error(c *gin.Context, err error) bool {
-
 	if err != nil {
-		c.Error(err)
+		err = c.Error(err)
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
 			"path":      c.Request.URL.Path,
 			"timestamp": time.Now(),
@@ -18,6 +17,7 @@ func Error(c *gin.Context, err error) bool {
 			"error":     http.StatusText(http.StatusInternalServerError),
 			"message":   err.Error(),
 		})
+
 		return true
 	}
 
