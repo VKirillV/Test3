@@ -7,7 +7,6 @@ import (
 	start "library/TelegramBotConnection"
 	"os"
 
-	"uclass_console / internal / controllers"
 	"github.com/gin-gonic/gin"
 	_ "github.com/joho/godotenv/autoload"
 	log "github.com/sirupsen/logrus"
