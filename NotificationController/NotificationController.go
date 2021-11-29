@@ -5,7 +5,6 @@ import (
 	db "library/ConnectionDatabase"
 	Error "library/JsonError"
 	telegrambot "library/TelegramBot"
-	"net/http"
 
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
@@ -24,6 +23,8 @@ func AdminNotificationController(ctx *gin.Context) {
 
 		return
 	}
+
+	escapeMessage := telegrambot.EscapeMessage(string(message))
 
 	rows, err := db.Connect().Query("Select telegram_chat_id, username FROM user "+
 		"WHERE user_type = (?) AND telegram_chat_id IS NOT NULL", admin)
@@ -46,14 +47,8 @@ func AdminNotificationController(ctx *gin.Context) {
 			log.Error("The structures does not match! ", err)
 		}
 
-		processedNotification := telegrambot.EscapeMessage(string(message))
-
-		go telegrambot.SendMessage(processedNotification, telegramUser, messageChatID)
+		go telegrambot.SendMessage(escapeMessage, telegramUser, messageChatID)
 	}
-
-	processedNotification := telegrambot.EscapeMessage(string(message))
-
-	ctx.JSON(http.StatusOK, Notification{processedNotification})
 }
 
 func ClientNotificationController(ctx *gin.Context) {
@@ -67,7 +62,7 @@ func ClientNotificationController(ctx *gin.Context) {
 		return
 	}
 
-	processedNotification := telegrambot.EscapeMessage(string(message))
+	escapeMessage := telegrambot.EscapeMessage(string(message))
 
 	rows, err := db.Connect().Query("Select username, telegram_chat_id FROM user "+
 		"LEFT JOIN client_user ON user.id = client_user.user_fk "+
@@ -93,7 +88,6 @@ func ClientNotificationController(ctx *gin.Context) {
 			log.Error("The structures does not match! ", err)
 		}
 
-		go telegrambot.SendMessage(processedNotification, telegramUser, messageChatID)
+		go telegrambot.SendMessage(escapeMessage, telegramUser, messageChatID)
 	}
-	ctx.JSON(http.StatusOK, Notification{processedNotification})
 }

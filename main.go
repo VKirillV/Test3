@@ -4,17 +4,20 @@ import (
 	admincontroller "library/AdminController"
 	clientcontroller "library/ClientController"
 	notificationcontroller "library/NotificationController"
-	start "library/TelegramBotConnection"
+	telegrambot "library/TelegramBot"
 	"os"
 
+	"unclass_console\internal\controllers"
 	"github.com/gin-gonic/gin"
 	_ "github.com/joho/godotenv/autoload"
 	log "github.com/sirupsen/logrus"
 )
 
 func main() {
+	telegrambot.Bot = telegrambot.InitBot()
 
-	go start.ConnectBot()
+	go telegrambot.Listen()
+
 	log.Info("Server is starting...")
 
 	port_server := ":" + os.Getenv("port_server")
@@ -29,9 +32,9 @@ func main() {
 	r.GET("/client", clientcontroller.GetClientController)
 	r.POST("/admin", notificationcontroller.AdminNotificationController)
 	r.POST("/client/:client_guid", notificationcontroller.ClientNotificationController)
-	err := r.Run(port_server)
-	if err != nil {
-		log.Error(err)
+	errServer := r.Run(port_server)
+	if errServer != nil {
+		log.Error(errServer)
 	}
 
 }

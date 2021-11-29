@@ -1,15 +1,12 @@
 package telegrambot
 
 import (
-	"database/sql"
-	"fmt"
 	db "library/ConnectionDatabase"
-	"net/http"
 	"os"
-	"regexp"
+	"strings"
 
-	"github.com/gin-gonic/gin"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
+
 	log "github.com/sirupsen/logrus"
 )
 
@@ -18,12 +15,19 @@ type Data struct {
 	TelegramChatID int
 }
 
-func Start(startBot *tgbotapi.BotAPI, tx *sql.Tx, c *gin.Context) {
+const ESCAPE_CHAR = "\\"
+
+var (
+	CHARS_TO_ESCAPE = []string{"[", "]", "(", ")", "`", ">", "#", "+", "-", "=", "|", "{", "}", ".", "!", "_"}
+	Bot             *tgbotapi.BotAPI
+)
+
+func Listen() {
 	log.Info("GoGinBot is starting...")
 
 	u := tgbotapi.NewUpdate(0)
-
-	updates, err := startBot.GetUpdatesChan(u)
+	u.Timeout = 60
+	updates, err := Bot.GetUpdatesChan(u)
 	if err != nil {
 		log.Error(err)
 	}
@@ -42,47 +46,60 @@ func Start(startBot *tgbotapi.BotAPI, tx *sql.Tx, c *gin.Context) {
 		messageChatID := update.Message.Chat.ID
 
 		username, telegramChatID := PrepareChatID(telegramUser)
-		if username == telegramUser {
-			if telegramChatID == 0 {
-				update, err := db.Connect().Prepare("UPDATE user SET telegram_chat_id = (?) WHERE username = (?)")
-				if err != nil {
-					log.Error("Failed to update data in the database! ", err)
-				}
+		if username != telegramUser {
+			continue
+		}
 
-				_, err = update.Exec(messageChatID, username)
-				if err != nil {
-					log.Error("Failed to update data in the database! ", err)
-				}
+		if telegramChatID == 0 {
 
-				update.Close()
+			update, err := db.Connect().Prepare("UPDATE user SET telegram_chat_id = (?) WHERE username = (?)")
+			if err != nil {
+				log.Error("Failed to update data in the database! ", err)
+			}
 
-				msg := tgbotapi.NewMessage(messageChatID, "Successfully subscribed on updates")
+			_, err = update.Exec(messageChatID, username)
+			if err != nil {
+				log.Error("Failed to update data in the database! ", err)
+			}
 
-				_, err = startBot.Send(msg)
-				if err == nil {
-					log.Infof("Message successfully delivered to %s", telegramUser)
-				} else if err != nil {
-					log.Errorf("Message delivery failed to user %s with error: %s", telegramUser, err)
-				}
-			} else {
-				msg := tgbotapi.NewMessage(messageChatID, "You are registered")
-				_, err = startBot.Send(msg)
-				if err == nil {
-					log.Infof("Message successfully delivered to %s", telegramUser)
-				} else if err != nil {
-					log.Errorf("Message delivery failed to user %s with error: %s", telegramUser, err)
-				}
+			update.Close()
+
+			msg := tgbotapi.NewMessage(messageChatID, "Successfully subscribed on updates")
+
+			_, err = Bot.Send(msg)
+			if err == nil {
+				log.Infof("Message successfully delivered to %s", telegramUser)
+			} else if err != nil {
+				log.Errorf("Message delivery failed to user %s with error: %s", telegramUser, err)
+			}
+		} else {
+			msg := tgbotapi.NewMessage(messageChatID, "You are registered")
+			_, err = Bot.Send(msg)
+			if err == nil {
+				log.Infof("Message successfully delivered to %s", telegramUser)
+			} else if err != nil {
+				log.Errorf("Message delivery failed to user %s with error: %s", telegramUser, err)
 			}
 		}
 	}
 }
 
-func SendMessage(notification string, telegramUser string, messageChatID int64) {
+func InitBot() *tgbotapi.BotAPI {
 	token := os.Getenv("TOKEN")
+	bot, err := tgbotapi.NewBotAPI(token)
+	if err != nil {
+		log.Panic(err)
+	}
 
-	url := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage?chat_id=%d&text=%s", token, messageChatID, notification)
+	bot.Debug = true
 
-	_, err := http.Get(url)
+	return bot
+}
+
+func SendMessage(notification string, telegramUser string, messageChatID int64) {
+	msg := tgbotapi.NewMessage(messageChatID, notification)
+	_, err := Bot.Send(msg)
+
 	if err == nil {
 		log.Infof("Message successfully delivered to %s", telegramUser)
 	} else if err != nil {
@@ -114,8 +131,17 @@ func PrepareChatID(telegramUser string) (username string, telegramChatID int) {
 }
 
 func EscapeMessage(notification string) (newNotification string) {
-	re := regexp.MustCompile(`[[:punct:]]`)
-	newNotification = re.ReplaceAllString(notification, "")
+	var builder strings.Builder
 
-	return newNotification
+	for _, word := range notification {
+		for _, word1 := range CHARS_TO_ESCAPE {
+			if strings.Contains(string(word), string(word1)) {
+				builder.WriteString(ESCAPE_CHAR)
+			}
+		}
+
+		builder.WriteString(string(word))
+	}
+
+	return builder.String()
 }
