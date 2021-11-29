@@ -7,7 +7,7 @@ import (
 	telegrambot "library/TelegramBot"
 	"os"
 
-	"unclass_console\internal\controllers"
+	//"unclass_console\internal\controllers"
 	"github.com/gin-gonic/gin"
 	_ "github.com/joho/godotenv/autoload"
 	log "github.com/sirupsen/logrus"
