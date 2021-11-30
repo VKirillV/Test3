@@ -32,13 +32,6 @@ func PostAdminController(ctx *gin.Context) {
 		return
 	}
 
-	defer func() {
-		err = txn.Rollback()
-		if err != nil {
-			log.Error(err)
-		}
-	}()
-
 	checkID := take.ID(txn, ctx, adminname)
 	if checkID == nil {
 		insert, err := txn.Prepare("INSERT INTO user(username, user_type) VALUES(?, ?)")
@@ -86,13 +79,6 @@ func DeleteAdminController(ctx *gin.Context) {
 
 		return
 	}
-
-	defer func() {
-		err = txn.Rollback()
-		if err != nil {
-			log.Error(err)
-		}
-	}()
 
 	update, err := txn.Prepare("UPDATE user SET user_type = (?) WHERE username = (?)")
 	if Error.Error(ctx, err) {

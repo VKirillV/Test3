@@ -41,13 +41,6 @@ func PostClientController(ctx *gin.Context) {
 		return
 	}
 
-	defer func() {
-		err = txn.Rollback()
-		if err != nil {
-			log.Error(err)
-		}
-	}()
-
 	selectID := take.ID(txn, ctx, username)
 	if selectID == nil {
 		insert, err := txn.Prepare("INSERT INTO user(username, user_type) VALUES(?, ?)")
@@ -99,13 +92,6 @@ func DeleteClientController(ctx *gin.Context) {
 
 		return
 	}
-
-	defer func() {
-		err = txn.Rollback()
-		if err != nil {
-			log.Error(err)
-		}
-	}()
 
 	statement, err := db.Connect().Prepare("DELETE client_user FROM client_user " +
 		"JOIN user ON user.id = client_user.user_fk " +

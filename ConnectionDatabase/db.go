@@ -45,7 +45,7 @@ func Connect() *sql.DB {
 	)
 
 	err = mgt.Steps(steps)
-	if err != nil {
+	if err == nil {
 		log.Error(err)
 	}
 

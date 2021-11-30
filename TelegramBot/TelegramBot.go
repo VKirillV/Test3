@@ -3,6 +3,7 @@ package telegrambot
 import (
 	db "library/ConnectionDatabase"
 	"os"
+	"strconv"
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
@@ -15,11 +16,11 @@ type Data struct {
 	TelegramChatID int
 }
 
-const ESCAPE_CHAR = "\\"
+const ESCAPE_RUNE = '\\'
 
 var (
-	CHARS_TO_ESCAPE = []string{"[", "]", "(", ")", "`", ">", "#", "+", "-", "=", "|", "{", "}", ".", "!", "_"}
-	Bot             *tgbotapi.BotAPI
+	RUNE_TO_ESCAPE = []rune{'[', ']', '(', ')', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!', '_'}
+	Bot            *tgbotapi.BotAPI
 )
 
 func Listen() {
@@ -45,7 +46,7 @@ func Listen() {
 
 		messageChatID := update.Message.Chat.ID
 
-		username, telegramChatID := PrepareChatID(telegramUser)
+		username, telegramChatID := FoundChatID(telegramUser)
 		if username != telegramUser {
 			continue
 		}
@@ -85,13 +86,15 @@ func Listen() {
 }
 
 func InitBot() *tgbotapi.BotAPI {
+
 	token := os.Getenv("TOKEN")
+	debug := os.Getenv("DEBUG")
 	bot, err := tgbotapi.NewBotAPI(token)
 	if err != nil {
 		log.Panic(err)
 	}
 
-	bot.Debug = true
+	bot.Debug, _ = strconv.ParseBool(debug)
 
 	return bot
 }
@@ -107,7 +110,7 @@ func SendMessage(notification string, telegramUser string, messageChatID int64) 
 	}
 }
 
-func PrepareChatID(telegramUser string) (username string, telegramChatID int) {
+func FoundChatID(telegramUser string) (username string, telegramChatID int) {
 	var data Data
 
 	rows, err := db.Connect().Query("Select username, telegram_chat_id FROM user WHERE username = (?)", telegramUser)
@@ -133,14 +136,13 @@ func PrepareChatID(telegramUser string) (username string, telegramChatID int) {
 func EscapeMessage(notification string) (newNotification string) {
 	var builder strings.Builder
 
-	for _, word := range notification {
-		for _, word1 := range CHARS_TO_ESCAPE {
-			if strings.Contains(string(word), string(word1)) {
-				builder.WriteString(ESCAPE_CHAR)
+	for _, specialWord := range notification {
+		for _, specialWord2 := range RUNE_TO_ESCAPE {
+			if strings.Contains(string(specialWord), string(specialWord2)) {
+				builder.WriteRune(ESCAPE_RUNE)
 			}
 		}
-
-		builder.WriteString(string(word))
+		builder.WriteRune(specialWord)
 	}
 
 	return builder.String()
