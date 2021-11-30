@@ -26,9 +26,9 @@ var (
 func Listen() {
 	log.Info("GoGinBot is starting...")
 
-	u := tgbotapi.NewUpdate(0)
-	u.Timeout = 60
-	updates, err := Bot.GetUpdatesChan(u)
+	upd := tgbotapi.NewUpdate(0)
+	upd.Timeout = 60
+	updates, err := Bot.GetUpdatesChan(upd)
 	if err != nil {
 		log.Error(err)
 	}
