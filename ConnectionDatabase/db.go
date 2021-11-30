@@ -44,10 +44,7 @@ func Connect() *sql.DB {
 		driver,
 	)
 
-	err = mgt.Steps(steps)
-	if err == nil {
-		log.Error(err)
-	}
+	mgt.Steps(steps)
 
 	database.SetConnMaxLifetime(lifeTime * time.Minute)
 	database.SetMaxOpenConns(openConns)
