@@ -14,10 +14,10 @@ import (
 )
 
 func main() {
-	telegrambot.Bot = telegrambot.InitBot()
-
+	telegrambot.MainBot = telegrambot.InitMainBot()
+	telegrambot.HealthBot = telegrambot.InitHealthBot()
 	go telegrambot.Listen()
-
+	log.SetReportCaller(true)
 	log.Info("Server is starting...")
 
 	port_server := ":" + os.Getenv("port_server")
@@ -32,6 +32,7 @@ func main() {
 	r.GET("/client", clientcontroller.GetClientController)
 	r.POST("/admin", notificationcontroller.AdminNotificationController)
 	r.POST("/client/:client_guid", notificationcontroller.ClientNotificationController)
+	r.POST("/health", notificationcontroller.HealthBotController)
 	errServer := r.Run(port_server)
 	if errServer != nil {
 		log.Error(errServer)

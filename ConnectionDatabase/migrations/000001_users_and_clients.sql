@@ -1,3 +1,4 @@
+-- +goose Up
 create table user
 (
     id               int unsigned not null auto_increment,
@@ -16,3 +17,5 @@ create table client_user
     primary key (id),
     foreign key (user_fk) references user (id)
 );
+
+DROP TABLE user, client_user;

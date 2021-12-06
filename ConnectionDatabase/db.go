@@ -6,16 +6,12 @@ import (
 	"os"
 	"time"
 
-	"github.com/golang-migrate/migrate"
-	"github.com/golang-migrate/migrate/database/mysql"
-	_ "github.com/golang-migrate/migrate/source/file"
+	_ "github.com/go-sql-driver/mysql"
 	log "github.com/sirupsen/logrus"
 )
 
 func Connect() *sql.DB {
 	var err error
-
-	const steps = 2
 
 	const openConns = 100
 
@@ -36,15 +32,6 @@ func Connect() *sql.DB {
 	if err != nil {
 		log.Panic("Failed to connect to database: ", err)
 	}
-
-	driver, _ := mysql.WithInstance(database, &mysql.Config{})
-	mgt, _ := migrate.NewWithDatabaseInstance(
-		"file://ConnectionDatabase/migrations",
-		"mysql",
-		driver,
-	)
-
-	mgt.Steps(steps)
 
 	database.SetConnMaxLifetime(lifeTime * time.Minute)
 	database.SetMaxOpenConns(openConns)
