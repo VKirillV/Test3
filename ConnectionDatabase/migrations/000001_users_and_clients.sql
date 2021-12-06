@@ -18,4 +18,5 @@ create table client_user
     foreign key (user_fk) references user (id)
 );
 
+-- +goose Down
 DROP TABLE user, client_user;
