@@ -23,7 +23,7 @@ const (
 )
 
 func PostAdminController(ctx *gin.Context) {
-	adminname := ctx.Param("adminname")
+	adminname := ctx.Param("name")
 
 	txn, err := db.Connect().Begin()
 	if Error.Error(ctx, err) {
@@ -71,7 +71,7 @@ func PostAdminController(ctx *gin.Context) {
 }
 
 func DeleteAdminController(ctx *gin.Context) {
-	adminname := ctx.Param("adminname")
+	adminname := ctx.Param("name")
 
 	txn, err := db.Connect().Begin()
 	if Error.Error(ctx, err) {

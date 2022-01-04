@@ -31,7 +31,7 @@ const (
 )
 
 func PostClientController(ctx *gin.Context) {
-	username := ctx.Param("username")
+	username := ctx.Param("name")
 	guid := ctx.Param("guid")
 
 	txn, err := db.Connect().Begin()
@@ -83,7 +83,7 @@ func PostClientController(ctx *gin.Context) {
 }
 
 func DeleteClientController(ctx *gin.Context) {
-	username := ctx.Param("username")
+	username := ctx.Param("name")
 	guid := ctx.Param("guid")
 
 	txn, err := db.Connect().Begin()
